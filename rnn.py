@@ -86,7 +86,7 @@ class SentimentFlow(FlowSpec):
     @staticmethod
     def load_glove_embeddings(glove_file_path, embedding_dim=100):
         """
-        Helper function to load GloVe embeddings.
+        Helper function to load GloVe embeddings. The start step method utilizes this function.
         """
         embeddings = {}
         with open(glove_file_path, 'r', encoding='utf-8') as f:
