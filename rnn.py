@@ -44,8 +44,8 @@ class SentimentFlow(FlowSpec):
     """
     glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="kazanova/sentiment140")
-    num_epochs = Parameter("num_epochs", 10)
-    batch_size = Parameter("batch_size", 8)
+    num_epochs = Parameter("num_epochs", 5)
+    batch_size = Parameter("batch_size", 64)
     hidden_size = Parameter("hidden_size", 128)
     output_size = Parameter("output_size", 3) # (positive, negative, neutral)
     
@@ -123,7 +123,7 @@ class SentimentFlow(FlowSpec):
         
         self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-        
+
         self.next(self.model)
 
     @step
@@ -167,9 +167,26 @@ class SentimentFlow(FlowSpec):
                 optimizer.step()
                 
                 running_loss += loss.item()
-                if i % 10 == 0:  # print every 10 batches
+                if i % 1000 == 0:  # print every 10 batches
                     print(f"Epoch [{epoch+1}/{self.num_epochs}], Step [{i+1}/{len(self.train_loader)}], Loss: {loss.item()}")
                 
+        self.next(self.test)
+
+    @step
+    def test(self):
+        self.rnn_model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for texts, labels in self.test_loader:
+                outputs = self.rnn_model(texts)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        accuracy = 100 * correct / total
+        print(f'Accuracy: {accuracy:.2f}%')
+
         self.next(self.end)
 
     @step
