@@ -9,6 +9,21 @@ import pandas as pd
 import kagglehub
 import os
 
+class RNNModel(nn.Module):
+    """
+    Define the class for the RNN model. Metaflow steps are all after this class declaration. 
+    """
+    def __init__(self, vocab_size, embed_size, hidden_size, output_size):
+        super(RNNModel, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_size)
+        self.rnn = nn.RNN(embed_size, hidden_size, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+            
+    def forward(self, x):
+        _, hidden = self.rnn(x)
+        output = self.fc(hidden.squeeze(0))
+        return output
+
 
 class SentimentFlow(FlowSpec):
     """
@@ -22,12 +37,10 @@ class SentimentFlow(FlowSpec):
     """
     glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="kazanova/sentiment140")
-    
-    batch_size = Parameter("batch_size", default=32)
-    epochs = Parameter("epochs", default=10)
 
-    embed_size = Parameter("embed_size", 128)
     hidden_size = Parameter("hidden_size", 128)
+
+    # Output size is set to 3 because of the multiclassification (positive, negative, neutral)
     output_size = Parameter("output_size", 3)
     
     @step
@@ -41,7 +54,10 @@ class SentimentFlow(FlowSpec):
         self.file_path = os.path.join(self.dataset_path, "training.1600000.processed.noemoticon.csv")
         
         print("Loading GloVe embeddings...")
-        self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
+        if not os.path.exists(self.glove_path):
+            raise FileNotFoundError(f"GloVe file not found at: {self.glove_path}")
+        else:
+            self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
         
         self.next(self.load_data)
 
@@ -64,25 +80,23 @@ class SentimentFlow(FlowSpec):
         """
         Tokenize and create embedding matrices for train and test sets.
         """
-        def tokenize_and_create_embeddings(texts, glove_embeddings, max_features=1000):
-            vectorizer = CountVectorizer(max_features=max_features, stop_words="english")
-            X = vectorizer.fit_transform(texts).toarray()
+        def create_embedding_matrix(vectorizer, glove_embeddings):
             word_to_index = {word: idx for idx, word in enumerate(vectorizer.get_feature_names_out())}
             embedding_matrix = np.zeros((len(word_to_index), 100))
             for word, idx in word_to_index.items():
                 if word in glove_embeddings:
                     embedding_matrix[idx] = glove_embeddings[word]
-            return X, word_to_index, embedding_matrix
+            return embedding_matrix
+
+        print("Fitting tokenizer on train data...")
+        self.vectorizer = CountVectorizer(max_features=1000, stop_words="english")
+        self.X_train = self.vectorizer.fit_transform(self.train_data["text"]).toarray()
+        self.embedding_matrix = create_embedding_matrix(self.vectorizer, self.glove_embeddings)
         
-        print("Processing train data...")
-        self.X_train, self.word_to_index, self.embedding_matrix = tokenize_and_create_embeddings(
-            self.train_data["text"], self.glove_embeddings
-        )
-        
-        print("Processing test data...")
-        self.X_test, _, _ = tokenize_and_create_embeddings(
-            self.test_data["text"], self.glove_embeddings
-        )
+        print("Transforming test data...")
+        self.X_test = self.vectorizer.transform(self.test_data["text"]).toarray()
+        self.y_train = self.train_data["label"].values
+        self.y_test = self.test_data["label"].values
         
         self.next(self.model)
 
@@ -91,33 +105,37 @@ class SentimentFlow(FlowSpec):
         """
         Define the RNN model.
         """
-        print("Generating RNN model.")
-
-
+        print("Generating RNN model...")
+        vocab_size, embed_size = self.embedding_matrix.shape
+        self.rnn_model = RNNModel(
+            vocab_size=vocab_size,
+            embed_size=embed_size,
+            hidden_size=self.hidden_size,
+            output_size=self.output_size
+        )
         self.next(self.train)
 
     @step
     def train(self):
         """
-        Train the model.
+        Train the RNN model.
         """
-        print("Training RNN model.")
-
-
+        print("Training the model...")
+        pass
+        
         self.next(self.end)
 
     @step
     def end(self):
         """
-        Final step: Wrap up and summarize results.
+        Final step: Print summary.
         """
-        print("Data preprocessing complete!")
+        print("Training complete.")
         print(f"Train data shape: {self.X_train.shape}")
         print(f"Test data shape: {self.X_test.shape}")
-        print("Ready for training a model.")
 
     @staticmethod
-    def load_glove_embeddings(glove_file_path, embedding_dim=100):
+    def load_glove_embeddings(glove_file_path):
         """
         Helper function to load GloVe embeddings. The start step method utilizes this function.
         """
@@ -129,44 +147,6 @@ class SentimentFlow(FlowSpec):
                 vector = np.asarray(values[1:], dtype="float32")
                 embeddings[word] = vector
         return embeddings
-    
-    @staticmethod
-    def define_neural(input_size, hidden_size, output_size, embedding_matrix, num_layers=1, dropout=0.5):
-        """
-        Helper function to define a RNN model with PyTorch.
-
-        Args:
-            input_size (int): Size of the input features (embedding dimension).
-            hidden_size (int): Number of hidden units in the RNN.
-            output_size (int): Number of output classes (e.g., 2 for binary classification).
-            embedding_matrix (np.ndarray): Pretrained embedding matrix.
-            num_layers (int): Number of RNN layers.
-            dropout (float): Dropout probability.
-
-        Returns:
-            torch.nn.Module: A PyTorch RNN model.
-
-        """
-        class RNNModel(nn.Module):
-            def __init__(self, input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout):
-                super(RNNModel, self).__init__()
-                vocab_size, embedding_dim = embedding_matrix.shape 
-                self.embedding = nn.Embedding(vocab_size, embedding_dim)
-
-                self.rnn = nn.RNN(input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout)
-
-                self.fc = nn.Linear(hidden_size, output_size)
-            
-            def forward(self, x):
-                x = self.embedding(x)
-                h0 = torch.zeros(1, x.size(0), hidden_size).to(x.device)
-                out, _ = self.rnn(x, h0)
-                out = self.fc(out[:, -1, :])
-                return out
-
-        return RNNModel(input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout)
-    
-
 
 if __name__ == "__main__":
     SentimentFlow()
