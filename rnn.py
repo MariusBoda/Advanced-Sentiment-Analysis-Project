@@ -11,9 +11,20 @@ import os
 
 
 class SentimentFlow(FlowSpec):
-    #parameters
+    """
+    Parameters and hyperparameters for the RNN model. 
+
+    GloVe data is from: https://nlp.stanford.edu/projects/glove/
+    Download the glove.6B.100d.txt file from there.
+
+    Kaggle dataset is pulled using API. 
+    Consult this webpage for more information: https://www.kaggle.com/datasets/kazanova/sentiment140/data
+    """
     glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="kazanova/sentiment140")
+    
+    batch_size = Parameter("batch_size", default=32)
+    epochs = Parameter("epochs", default=10)
     
     @step
     def start(self):
@@ -37,8 +48,6 @@ class SentimentFlow(FlowSpec):
         """
         columns = ['target', 'id', 'date', 'flag', 'user', 'text']
         full_data = pd.read_csv(self.file_path, encoding="latin-1", names=columns)
-        
-        # Simplify the dataset
         self.data = full_data[['target', 'text']].rename(columns={"target": "label"})
         
         print("Splitting data into train and test sets...")
@@ -74,6 +83,14 @@ class SentimentFlow(FlowSpec):
         self.next(self.end)
 
     @step
+    def model(self):
+        """
+        Define and create the rnn model.
+        """
+        print("Generating RNN model.")
+
+
+    @step
     def end(self):
         """
         Final step: Wrap up and summarize results.
@@ -96,6 +113,13 @@ class SentimentFlow(FlowSpec):
                 vector = np.asarray(values[1:], dtype="float32")
                 embeddings[word] = vector
         return embeddings
+    
+    @staticmethod
+    def define_neural():
+        """
+        Helper function to define the RNN.
+        """
+        pass
 
 
 if __name__ == "__main__":
