@@ -2,6 +2,7 @@ from metaflow import FlowSpec, step, Parameter, current
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
@@ -104,18 +105,25 @@ class SentimentFlow(FlowSpec):
         self.y_train = self.train_data["label"].values
         self.y_test = self.test_data["label"].values
         
-        train_dataset = TensorDataset(
-            torch.tensor(self.X_train, dtype=torch.long), 
-            torch.tensor(self.y_train, dtype=torch.long)
-        )
-        test_dataset = TensorDataset(
-            torch.tensor(self.X_test, dtype=torch.long), 
-            torch.tensor(self.y_test, dtype=torch.long)
-        )
-
+        # Convert the X_train and X_test data into tensors
+        self.X_train = torch.tensor(self.X_train, dtype=torch.long)
+        self.X_test = torch.tensor(self.X_test, dtype=torch.long)
+        
+        # Apply padding to make sequences in X_train and X_test the same length
+        self.X_train_padded = pad_sequence([torch.tensor(x) for x in self.X_train], batch_first=True, padding_value=0)
+        self.X_test_padded = pad_sequence([torch.tensor(x) for x in self.X_test], batch_first=True, padding_value=0)
+        
+        # Make sure the y_train and y_test remain unchanged (no padding needed for labels)
+        self.y_train = torch.tensor(self.y_train, dtype=torch.long)
+        self.y_test = torch.tensor(self.y_test, dtype=torch.long)
+        
+        # Prepare the DataLoader
+        train_dataset = TensorDataset(self.X_train_padded, self.y_train)
+        test_dataset = TensorDataset(self.X_test_padded, self.y_test)
+        
         self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-
+        
         self.next(self.model)
 
     @step
@@ -143,21 +151,25 @@ class SentimentFlow(FlowSpec):
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(self.rnn_model.parameters(), lr=0.001)  
         
+        for texts, labels in self.train_loader:
+            print(f"Batch: texts.shape={texts.shape}, labels.shape={labels.shape}")
+            break  # just to see one batch
+
         for epoch in range(self.num_epochs):
             self.rnn_model.train()
-            epoch_loss = 0
-            for texts, labels in self.train_loader:
+            running_loss = 0.0
+            for i, (texts, labels) in enumerate(self.train_loader):
+                # Forward pass
                 outputs = self.rnn_model(texts)
                 loss = criterion(outputs, labels)
-                
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 
-                epoch_loss += loss.item()
-
-            print(f'Epoch [{epoch+1}/{self.num_epochs}], Loss: {epoch_loss / len(self.train_loader):.4f}')
-
+                running_loss += loss.item()
+                if i % 10 == 0:  # print every 10 batches
+                    print(f"Epoch [{epoch+1}/{self.num_epochs}], Step [{i+1}/{len(self.train_loader)}], Loss: {loss.item()}")
+                
         self.next(self.end)
 
     @step
