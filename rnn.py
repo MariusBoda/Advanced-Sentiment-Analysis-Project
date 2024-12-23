@@ -25,6 +25,10 @@ class SentimentFlow(FlowSpec):
     
     batch_size = Parameter("batch_size", default=32)
     epochs = Parameter("epochs", default=10)
+
+    embed_size = Parameter("embed_size", 128)
+    hidden_size = Parameter("hidden_size", 128)
+    output_size = Parameter("output_size", 3)
     
     @step
     def start(self):
@@ -80,15 +84,27 @@ class SentimentFlow(FlowSpec):
             self.test_data["text"], self.glove_embeddings
         )
         
-        self.next(self.end)
+        self.next(self.model)
 
     @step
     def model(self):
         """
-        Define and create the rnn model.
+        Define the RNN model.
         """
         print("Generating RNN model.")
 
+
+        self.next(self.train)
+
+    @step
+    def train(self):
+        """
+        Train the model.
+        """
+        print("Training RNN model.")
+
+
+        self.next(self.end)
 
     @step
     def end(self):
@@ -115,11 +131,41 @@ class SentimentFlow(FlowSpec):
         return embeddings
     
     @staticmethod
-    def define_neural():
+    def define_neural(input_size, hidden_size, output_size, embedding_matrix, num_layers=1, dropout=0.5):
         """
-        Helper function to define the RNN.
+        Helper function to define a RNN model with PyTorch.
+
+        Args:
+            input_size (int): Size of the input features (embedding dimension).
+            hidden_size (int): Number of hidden units in the RNN.
+            output_size (int): Number of output classes (e.g., 2 for binary classification).
+            embedding_matrix (np.ndarray): Pretrained embedding matrix.
+            num_layers (int): Number of RNN layers.
+            dropout (float): Dropout probability.
+
+        Returns:
+            torch.nn.Module: A PyTorch RNN model.
+
         """
-        pass
+        class RNNModel(nn.Module):
+            def __init__(self, input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout):
+                super(RNNModel, self).__init__()
+                vocab_size, embedding_dim = embedding_matrix.shape 
+                self.embedding = nn.Embedding(vocab_size, embedding_dim)
+
+                self.rnn = nn.RNN(input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout)
+
+                self.fc = nn.Linear(hidden_size, output_size)
+            
+            def forward(self, x):
+                x = self.embedding(x)
+                h0 = torch.zeros(1, x.size(0), hidden_size).to(x.device)
+                out, _ = self.rnn(x, h0)
+                out = self.fc(out[:, -1, :])
+                return out
+
+        return RNNModel(input_size, hidden_size, output_size, embedding_matrix, num_layers, dropout)
+    
 
 
 if __name__ == "__main__":
