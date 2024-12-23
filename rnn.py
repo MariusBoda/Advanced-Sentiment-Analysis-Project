@@ -2,6 +2,7 @@ from metaflow import FlowSpec, step, Parameter, current
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
@@ -13,13 +14,18 @@ class RNNModel(nn.Module):
     """
     Define the class for the RNN model. Metaflow steps are all after this class declaration. 
     """
-    def __init__(self, vocab_size, embed_size, hidden_size, output_size):
+    def __init__(self, vocab_size, embed_size, hidden_size, output_size, embedding_matrix):
         super(RNNModel, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embed_size)
+        self.embedding = nn.Embedding.from_pretrained(
+            torch.tensor(embedding_matrix, dtype=torch.float32), 
+            freeze=False
+        )
         self.rnn = nn.RNN(embed_size, hidden_size, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
             
     def forward(self, x):
+        x = self.embedding(x)
+        x = x.float()
         _, hidden = self.rnn(x)
         output = self.fc(hidden.squeeze(0))
         return output
@@ -37,11 +43,10 @@ class SentimentFlow(FlowSpec):
     """
     glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="kazanova/sentiment140")
-
+    num_epochs = Parameter("num_epochs", 10)
+    batch_size = Parameter("batch_size", 8)
     hidden_size = Parameter("hidden_size", 128)
-
-    # Output size is set to 3 because of the multiclassification (positive, negative, neutral)
-    output_size = Parameter("output_size", 3)
+    output_size = Parameter("output_size", 3) # (positive, negative, neutral)
     
     @step
     def start(self):
@@ -69,6 +74,7 @@ class SentimentFlow(FlowSpec):
         columns = ['target', 'id', 'date', 'flag', 'user', 'text']
         full_data = pd.read_csv(self.file_path, encoding="latin-1", names=columns)
         self.data = full_data[['target', 'text']].rename(columns={"target": "label"})
+        self.data['label'] = self.data['label'].map({0: 0, 2: 1, 4: 2})
         
         print("Splitting data into train and test sets...")
         self.train_data, self.test_data = train_test_split(self.data, test_size=0.2, random_state=42)
@@ -89,7 +95,7 @@ class SentimentFlow(FlowSpec):
             return embedding_matrix
 
         print("Fitting tokenizer on train data...")
-        self.vectorizer = CountVectorizer(max_features=1000, stop_words="english")
+        self.vectorizer = CountVectorizer(max_features=500, stop_words="english")
         self.X_train = self.vectorizer.fit_transform(self.train_data["text"]).toarray()
         self.embedding_matrix = create_embedding_matrix(self.vectorizer, self.glove_embeddings)
         
@@ -98,6 +104,18 @@ class SentimentFlow(FlowSpec):
         self.y_train = self.train_data["label"].values
         self.y_test = self.test_data["label"].values
         
+        train_dataset = TensorDataset(
+            torch.tensor(self.X_train, dtype=torch.long), 
+            torch.tensor(self.y_train, dtype=torch.long)
+        )
+        test_dataset = TensorDataset(
+            torch.tensor(self.X_test, dtype=torch.long), 
+            torch.tensor(self.y_test, dtype=torch.long)
+        )
+
+        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+
         self.next(self.model)
 
     @step
@@ -111,7 +129,8 @@ class SentimentFlow(FlowSpec):
             vocab_size=vocab_size,
             embed_size=embed_size,
             hidden_size=self.hidden_size,
-            output_size=self.output_size
+            output_size=self.output_size,
+            embedding_matrix=self.embedding_matrix
         )
         self.next(self.train)
 
@@ -121,8 +140,24 @@ class SentimentFlow(FlowSpec):
         Train the RNN model.
         """
         print("Training the model...")
-        pass
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(self.rnn_model.parameters(), lr=0.001)  
         
+        for epoch in range(self.num_epochs):
+            self.rnn_model.train()
+            epoch_loss = 0
+            for texts, labels in self.train_loader:
+                outputs = self.rnn_model(texts)
+                loss = criterion(outputs, labels)
+                
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+                epoch_loss += loss.item()
+
+            print(f'Epoch [{epoch+1}/{self.num_epochs}], Loss: {epoch_loss / len(self.train_loader):.4f}')
+
         self.next(self.end)
 
     @step
