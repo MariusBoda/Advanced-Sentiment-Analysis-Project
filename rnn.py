@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
@@ -30,6 +30,19 @@ class RNNModel(nn.Module):
         _, hidden = self.rnn(x)
         output = self.fc(hidden.squeeze(0))
         return output
+    
+class SentimentDataset(Dataset):
+    def __init__(self, data):
+        self.texts = data['text'].values
+        self.labels = data['label'].values
+    
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        text = self.texts[idx]
+        label = self.labels[idx]
+        return torch.tensor(text, dtype=torch.long), torch.tensor(label, dtype=torch.long)
 
 
 class SentimentFlow(FlowSpec):
@@ -85,44 +98,9 @@ class SentimentFlow(FlowSpec):
     @step
     def tokenize_data(self):
         """
-        Tokenize and create embedding matrices for train and test sets.
+        Preprocess and tokenize the dataset, including creating an embedding matrix.
         """
-        def create_embedding_matrix(vectorizer, glove_embeddings):
-            word_to_index = {word: idx for idx, word in enumerate(vectorizer.get_feature_names_out())}
-            embedding_matrix = np.zeros((len(word_to_index), 100))
-            for word, idx in word_to_index.items():
-                if word in glove_embeddings:
-                    embedding_matrix[idx] = glove_embeddings[word]
-            return embedding_matrix
-
-        print("Fitting tokenizer on train data...")
-        self.vectorizer = CountVectorizer(max_features=500, stop_words="english")
-        self.X_train = self.vectorizer.fit_transform(self.train_data["text"]).toarray()
-        self.embedding_matrix = create_embedding_matrix(self.vectorizer, self.glove_embeddings)
-        
-        print("Transforming test data...")
-        self.X_test = self.vectorizer.transform(self.test_data["text"]).toarray()
-        self.y_train = self.train_data["label"].values
-        self.y_test = self.test_data["label"].values
-        
-        # Convert the X_train and X_test data into tensors
-        self.X_train = torch.tensor(self.X_train, dtype=torch.long)
-        self.X_test = torch.tensor(self.X_test, dtype=torch.long)
-        
-        # Apply padding to make sequences in X_train and X_test the same length
-        self.X_train_padded = pad_sequence([torch.tensor(x) for x in self.X_train], batch_first=True, padding_value=0)
-        self.X_test_padded = pad_sequence([torch.tensor(x) for x in self.X_test], batch_first=True, padding_value=0)
-        
-        # Make sure the y_train and y_test remain unchanged (no padding needed for labels)
-        self.y_train = torch.tensor(self.y_train, dtype=torch.long)
-        self.y_test = torch.tensor(self.y_test, dtype=torch.long)
-        
-        # Prepare the DataLoader
-        train_dataset = TensorDataset(self.X_train_padded, self.y_train)
-        test_dataset = TensorDataset(self.X_test_padded, self.y_test)
-        
-        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+        pass
 
         self.next(self.model)
 
