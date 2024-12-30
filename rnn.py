@@ -100,7 +100,7 @@ class SentimentFlow(FlowSpec):
         """
         Preprocess and tokenize the dataset, including creating an embedding matrix.
         """
-        pass
+        # to tokenize. need to first ...
 
         self.next(self.model)
 
