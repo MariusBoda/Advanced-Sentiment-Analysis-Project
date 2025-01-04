@@ -100,13 +100,37 @@ class SentimentFlow(FlowSpec):
         """
         Preprocess and tokenize the dataset, including creating an embedding matrix.
         """
-        vectorizer = CountVectorizer(tokenizer=lambda x: x.split(), lowercase=True)
-        vectorizer.fit(self.data['text'])
-        self.vocab = vectorizer.vocabulary_
-        self.tokenized_train = self.train_data['text'].apply(lambda x: [self.vocab[word] for word in x.split() if word in self.vocab])
-        self.tokenized_test = self.test_data['text'].apply(lambda x: [self.vocab[word] for word in x.split() if word in self.vocab])
+        # Initialize spaCy tokenizer and stopword list
+        import spacy
+        nlp = spacy.load("en_core_web_sm") #use python3 -m spacy download en_core_web_sm
+        stopwords = nlp.Defaults.stop_words
 
-        # Pad sequences
+        def preprocess_text(text):
+            doc = nlp(text)
+            return [
+                token.text.lower() 
+                for token in doc 
+                if token.text.isalpha() and token.text not in stopwords
+            ]
+
+        # Preprocess the text data
+        self.train_data['processed_text'] = self.train_data['text'].apply(preprocess_text)
+        self.test_data['processed_text'] = self.test_data['text'].apply(preprocess_text)
+
+        # Build vocabulary with the top 20,000 words
+        from collections import Counter
+        all_words = [word for text in self.train_data['processed_text'] for word in text]
+        most_common_words = Counter(all_words).most_common(20000)
+        self.vocab = {word: idx for idx, (word, _) in enumerate(most_common_words)}
+
+        # Tokenize and truncate sequences
+        def tokenize_sequence(text):
+            return [self.vocab[word] for word in text if word in self.vocab]
+
+        self.tokenized_train = self.train_data['processed_text'].apply(tokenize_sequence)
+        self.tokenized_test = self.test_data['processed_text'].apply(tokenize_sequence)
+
+        # Pad tokenized sequences
         self.padded_train = pad_sequence(
             [torch.tensor(seq) for seq in self.tokenized_train],
             batch_first=True, padding_value=0
@@ -120,13 +144,23 @@ class SentimentFlow(FlowSpec):
         self.train_labels = torch.tensor(self.train_data['label'].values, dtype=torch.long)
         self.test_labels = torch.tensor(self.test_data['label'].values, dtype=torch.long)
 
-        # Create embedding matrix
+        # Create embedding matrix using pre-trained GloVe embeddings
         embedding_dim = len(next(iter(self.glove_embeddings.values())))
         vocab_size = len(self.vocab)
         self.embedding_matrix = np.zeros((vocab_size, embedding_dim))
         for word, idx in self.vocab.items():
             if word in self.glove_embeddings:
                 self.embedding_matrix[idx] = self.glove_embeddings[word]
+
+        # Compute class weights for balanced dataset
+        from sklearn.utils.class_weight import compute_class_weight
+        classes = np.unique(self.train_data['label'])
+        class_weights = compute_class_weight(
+            class_weight='balanced',
+            classes=classes,
+            y=self.train_data['label'].values
+        )
+        self.class_weights = torch.tensor(class_weights, dtype=torch.float)
 
         # Create DataLoaders
         train_dataset = TensorDataset(self.padded_train, self.train_labels)
