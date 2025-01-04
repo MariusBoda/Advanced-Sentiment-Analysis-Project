@@ -100,8 +100,42 @@ class SentimentFlow(FlowSpec):
         """
         Preprocess and tokenize the dataset, including creating an embedding matrix.
         """
-        # to tokenize. need to first ...
+        vectorizer = CountVectorizer(tokenizer=lambda x: x.split(), lowercase=True)
+        vectorizer.fit(self.data['text'])
+        self.vocab = vectorizer.vocabulary_
+        self.tokenized_train = self.train_data['text'].apply(lambda x: [self.vocab[word] for word in x.split() if word in self.vocab])
+        self.tokenized_test = self.test_data['text'].apply(lambda x: [self.vocab[word] for word in x.split() if word in self.vocab])
 
+        # Pad sequences
+        self.padded_train = pad_sequence(
+            [torch.tensor(seq) for seq in self.tokenized_train],
+            batch_first=True, padding_value=0
+        )
+        self.padded_test = pad_sequence(
+            [torch.tensor(seq) for seq in self.tokenized_test],
+            batch_first=True, padding_value=0
+        )
+
+        # Convert labels to tensors
+        self.train_labels = torch.tensor(self.train_data['label'].values, dtype=torch.long)
+        self.test_labels = torch.tensor(self.test_data['label'].values, dtype=torch.long)
+
+        # Create embedding matrix
+        embedding_dim = len(next(iter(self.glove_embeddings.values())))
+        vocab_size = len(self.vocab)
+        self.embedding_matrix = np.zeros((vocab_size, embedding_dim))
+        for word, idx in self.vocab.items():
+            if word in self.glove_embeddings:
+                self.embedding_matrix[idx] = self.glove_embeddings[word]
+
+        # Create DataLoaders
+        train_dataset = TensorDataset(self.padded_train, self.train_labels)
+        test_dataset = TensorDataset(self.padded_test, self.test_labels)
+        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+
+        print(f"Vocabulary size: {vocab_size}")
+        print(f"Embedding matrix shape: {self.embedding_matrix.shape}")
         self.next(self.model)
 
     @step
