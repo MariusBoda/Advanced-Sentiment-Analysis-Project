@@ -161,6 +161,8 @@ class SentimentFlow(FlowSpec):
         - Truncated vocabulary with top 20,000 most frequent words.
         - Pre-trained GloVe embeddings for improved word representation.
         """
+        # to tokenize. need to first ...
+
         print("Building vocabulary with top 20,000 most frequent words...")
 
         # Build vocabulary from preprocessed text
