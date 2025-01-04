@@ -138,6 +138,13 @@ class SentimentFlow(FlowSpec):
             # Add the processed texts to the dataframe
             self.data['processed_text'] = processed_texts
 
+            # Encode preprocessed text as sequences of word indices
+            print("Encoding text data into sequences of word indices...")
+            def encode_text(tokens):
+                return [self.vocab[token] for token in tokens.split() if token in self.vocab]
+            
+            self.data['encoded_text'] = self.data['processed_text'].apply(encode_text)
+
             # Save processed data to cache
             print(f"Saving processed data to {cache_file} for future use...")
             self.data.to_csv(cache_file, index=False)
@@ -159,29 +166,22 @@ class SentimentFlow(FlowSpec):
         # Build vocabulary from preprocessed text
         vectorizer = CountVectorizer(
             max_features=20000,
-            tokenizer=lambda x: x.split(),  # Tokenized text from `preprocess` step
+            tokenizer=lambda x: str(x).split() if isinstance(x, str) else [],  # Handle non-strings by converting to empty list
             lowercase=False
         )
         vectorizer.fit(self.data['processed_text'])
         self.vocab = vectorizer.vocabulary_
         print(f"Vocabulary size after truncation: {len(self.vocab)}")
 
-        # Encode preprocessed text as sequences of word indices
-        print("Encoding text data into sequences of word indices...")
-        def encode_text(tokens):
-            return [self.vocab[token] for token in tokens.split() if token in self.vocab]
-
-        self.data['encoded_text'] = self.data['processed_text'].apply(encode_text)
-
         # Pad sequences
         print("Padding sequences...")
         self.padded_train = pad_sequence(
-            [torch.tensor(seq) for seq in self.train_data['encoded_text']],
+            [torch.tensor(seq) for seq in self.train_data['processed_text']],
             batch_first=True,
             padding_value=0
         )
         self.padded_test = pad_sequence(
-            [torch.tensor(seq) for seq in self.test_data['encoded_text']],
+            [torch.tensor(seq) for seq in self.test_data['processed_text']],
             batch_first=True,
             padding_value=0
         )
