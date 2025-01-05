@@ -90,136 +90,65 @@ class SentimentFlow(FlowSpec):
         full_data = pd.read_csv(self.file_path, encoding="latin-1", names=columns)
         self.data = full_data[['target', 'text']].rename(columns={"target": "label"})
         self.data['label'] = self.data['label'].map({0: 0, 2: 1, 4: 2})
-        
-        print("Splitting data into train and test sets...")
-        self.train_data, self.test_data = train_test_split(self.data, test_size=0.2, random_state=42)
-        
+            
         self.next(self.preprocess)
 
     @step
     def preprocess(self):
         """
-        Optimized preprocessing step using spaCy's `pipe` for batch processing.
-        Includes caching for faster re-runs.
+        Preprocess the Sentiment140 dataset in batches of 10,000 and save each batch to a CSV file.
         """
-        print("Loading spaCy model...")
-        nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])  # Disable unnecessary components
-        
-        # Access spaCy's built-in stop words
+        processed_file_path = 'processed_data.csv'
+
+        # Check if preprocessed data already exists
+        if os.path.exists(processed_file_path):
+            print(f"Loading preprocessed data from {processed_file_path}...")
+            self.data = pd.read_csv(processed_file_path)
+            print(f"Loaded {len(self.data)} preprocessed texts.")
+            self.next(self.tokenize_data)
+            return
+
+        print("Preprocessing data...")
+
+        # Load spaCy model
+        nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
         stopwords = nlp.Defaults.stop_words
 
-        # Check if cached processed data exists
-        cache_file = "processed_data.csv"
-        try:
-            print(f"Looking for cached file at: {cache_file}")
-            self.data = pd.read_csv(cache_file)
-            print(f"Loaded cached data from {cache_file}. Skipping preprocessing.")
-        except FileNotFoundError:
-            print("No cache found. Starting preprocessing...")
+        # Define a list of negation words
+        negation_words = {"not", "no", "never", "none", "nor", "n't"}
 
-            # Process text data efficiently using spaCy's pipe
-            def preprocess_text(doc):
-                return " ".join([token.text for token in doc if token.text.lower() not in stopwords and not token.is_punct])
+        # Process texts in batches of 10,000 and save to CSV
+        batch_size = 10000
+        total_rows = len(self.data)
 
-            # Initialize a counter to track progress
-            total_count = len(self.data)
-            processed_count = 0
+        for i in range(0, total_rows, batch_size):
+            batch = self.data.iloc[i:i + batch_size]
+            batch_end = min(i + batch_size, total_rows)
+            print(f"Processing batch {batch_end}/{total_rows}...")
 
-            # Process texts in batches
+            # Apply preprocessing in parallel using spaCy's pipe
             processed_texts = []
-            for doc in nlp.pipe(self.data['text'], batch_size=1000, disable=["ner", "parser"]):
-                processed_texts.append(preprocess_text(doc))
-                processed_count += 1
+            for doc in nlp.pipe(batch['text'], batch_size=batch_size, disable=["ner", "parser"]):
+                # Tokenize and remove stopwords and punctuation, but keep negations
+                processed_text = " ".join([
+                    token.text for token in doc 
+                    if (token.text.lower() not in stopwords or token.text.lower() in negation_words) and not token.is_punct
+                ])
+                processed_texts.append(processed_text)
 
-                # Print progress every 10000 texts processed
-                if processed_count % 10000 == 0:
-                    print(f"Processed {processed_count}/{total_count} texts...")
+            batch['processed_text'] = processed_texts
 
-            # Add the processed texts to the dataframe
-            self.data['processed_text'] = processed_texts
+            # Append processed batch to CSV
+            batch.to_csv(processed_file_path, mode='a', header=not os.path.exists(processed_file_path), index=False)
 
-            # Encode preprocessed text as sequences of word indices
-            print("Encoding text data into sequences of word indices...")
-            def encode_text(tokens):
-                return [self.vocab[token] for token in tokens.split() if token in self.vocab]
-            
-            self.data['encoded_text'] = self.data['processed_text'].apply(encode_text)
-
-            # Save processed data to cache
-            print(f"Saving processed data to {cache_file} for future use...")
-            self.data.to_csv(cache_file, index=False)
-
-        print("Preprocessing complete!")
+        print(f"Finished processing {total_rows} texts.")
         self.next(self.tokenize_data)
 
     @step
     def tokenize_data(self):
-        """
-        Tokenize and encode the preprocessed dataset.
-        Focuses on:
-        - Encoding the already preprocessed text into sequences of indices.
-        - Truncated vocabulary with top 20,000 most frequent words.
-        - Pre-trained GloVe embeddings for improved word representation.
-        """
-        # to tokenize. need to first ...
-
-        print("Building vocabulary with top 20,000 most frequent words...")
-
-        # Build vocabulary from preprocessed text
-        vectorizer = CountVectorizer(
-            max_features=20000,
-            tokenizer=lambda x: str(x).split() if isinstance(x, str) else [],  # Handle non-strings by converting to empty list
-            lowercase=False
-        )
-        vectorizer.fit(self.data['processed_text'])
-        self.vocab = vectorizer.vocabulary_
-        print(f"Vocabulary size after truncation: {len(self.vocab)}")
-
-        # Pad sequences
-        print("Padding sequences...")
-        self.padded_train = pad_sequence(
-            [torch.tensor(seq) for seq in self.train_data['processed_text']],
-            batch_first=True,
-            padding_value=0
-        )
-        self.padded_test = pad_sequence(
-            [torch.tensor(seq) for seq in self.test_data['processed_text']],
-            batch_first=True,
-            padding_value=0
-        )
-
-        # Convert labels to tensors
-        print("Converting labels to tensors...")
-        self.train_labels = torch.tensor(self.train_data['label'].values, dtype=torch.long)
-        self.test_labels = torch.tensor(self.test_data['label'].values, dtype=torch.long)
-
-        # Prepare GloVe embeddings
-        print("Preparing embedding matrix from GloVe embeddings...")
-        embedding_dim = len(next(iter(self.glove_embeddings.values())))
-        vocab_size = len(self.vocab)
-        self.embedding_matrix = np.zeros((vocab_size, embedding_dim))
-        for word, idx in self.vocab.items():
-            if word in self.glove_embeddings:
-                self.embedding_matrix[idx] = self.glove_embeddings[word]
-
-        print(f"Embedding matrix shape: {self.embedding_matrix.shape}")
-
-        # Compute class weights for the loss function
-        print("Computing class weights for the loss function...")
-        label_counts = self.train_data['label'].value_counts()
-        self.class_weights = {
-            label: len(self.train_data) / count for label, count in label_counts.items()
-        }
-        print(f"Class weights: {self.class_weights}")
-
-        # Create DataLoaders
-        print("Creating DataLoaders...")
-        train_dataset = TensorDataset(self.padded_train, self.train_labels)
-        test_dataset = TensorDataset(self.padded_test, self.test_labels)
-        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-
-        print("Tokenization and preprocessing complete.")
+        print("Building vocabulary from training data...")
+        self.data = pd.read_csv('processed_data.csv')
+        pass
         self.next(self.model)
 
     @step
