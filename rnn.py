@@ -61,7 +61,7 @@ class SentimentFlow(FlowSpec):
     num_epochs = Parameter("num_epochs", 5)
     batch_size = Parameter("batch_size", 64)
     hidden_size = Parameter("hidden_size", 128)
-    output_size = Parameter("output_size", 3) # (positive, negative, neutral)
+    output_size = Parameter("output_size", 2) # (positive, negative)
     
     @step
     def start(self):
@@ -89,7 +89,7 @@ class SentimentFlow(FlowSpec):
         columns = ['target', 'id', 'date', 'flag', 'user', 'text']
         full_data = pd.read_csv(self.file_path, encoding="latin-1", names=columns)
         self.data = full_data[['target', 'text']].rename(columns={"target": "label"})
-        self.data['label'] = self.data['label'].map({0: 0, 2: 1, 4: 2})
+        #self.data['label'] = self.data['label'].map({0: 0, 2: 1, 4: 2})
             
         self.next(self.preprocess)
 
