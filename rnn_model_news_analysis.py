@@ -10,40 +10,59 @@ from sklearn.model_selection import train_test_split
 import spacy
 import kagglehub
 from metaflow import FlowSpec, step, Parameter, current
+from collections import defaultdict
+from torch.utils.data import WeightedRandomSampler, DataLoader
+from transformers import BertTokenizer, BertModel
+import warnings
+
+class BertSentimentModel(nn.Module):
+    def __init__(self, output_dim):
+        super(BertSentimentModel, self).__init__()
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        self.fc = nn.Linear(self.bert.config.hidden_size, output_dim)
+
+    def forward(self, input_ids, attention_mask):
+        outputs = self.bert(input_ids, attention_mask=attention_mask)
+        hidden_state = outputs.last_hidden_state
+        pooled_output = hidden_state[:, 0]  # Take the first token's representation
+        return self.fc(pooled_output)
 
 class RNNModel(nn.Module):
-    """
-    Define the class for the RNN model. Metaflow steps are all after this class declaration. 
-    """
-    def __init__(self, input_dim, hidden_dim, output_dim, max_length):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, output_dim, max_length, glove_embeddings=None):
         super(RNNModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.max_length = max_length
-    
-        # Define layers
-        self.rnn = nn.RNN(input_dim, hidden_dim, batch_first=True)
+
+        # Embedding layer
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        if glove_embeddings is not None:
+            self.embedding.weight.data.copy_(torch.tensor(glove_embeddings, dtype=torch.float32))
+            self.embedding.weight.requires_grad = True  # Allow fine-tuning of embeddings
+
+        # RNN layer
+        self.rnn = nn.RNN(embedding_dim, hidden_dim, batch_first=True)
+
+        # Fully connected layer
         self.fc = nn.Linear(hidden_dim, output_dim)
-            
+
     def forward(self, x):
-        # Initialize hidden state
-        h0 = torch.zeros(1, x.size(0), self.hidden_dim).to(x.device)  # (num_layers, batch_size, hidden_dim)
-        # RNN Layer
+        # Pass through embedding layer
+        x = self.embedding(x)
+        h0 = torch.zeros(1, x.size(0), self.hidden_dim).to(x.device)
         out, _ = self.rnn(x, h0)
-        # Take the output from the last time step
         out = out[:, -1, :]
-        # Fully connected layer to get output
         out = self.fc(out)
         return out
-
 
 class SentimentFlow(FlowSpec):
 
     glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="ankurzing/sentiment-analysis-for-financial-news")
-    num_epochs = Parameter("num_epochs", 5)
-    batch_size = Parameter("batch_size", 64)
+    num_epochs = Parameter("num_epochs", 20)
+    batch_size = Parameter("batch_size", 32)
     hidden_size = Parameter("hidden_size", 128)
     output_size = Parameter("output_size", 3) # (positive, negative)
+    preprocessed_csv_path = "preprocessed_data.csv"  # Path to save the preprocessed data
     
     @step
     def start(self):
@@ -66,83 +85,89 @@ class SentimentFlow(FlowSpec):
 
     @step
     def preprocess(self):
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        # Label encoding for the labels
         le = LabelEncoder()
         self.data['label'] = le.fit_transform(self.data['label'])
-        nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
 
-        def preprocess_text(text):
-            doc = nlp(text.lower())
-            # Remove stopwords and non-alphabetic words, and return lemmatized words
-            return [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
+        # Load BERT tokenizer
+        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        self.max_length=128
+        # Tokenize text and prepare input for BERT
+        def tokenize_and_pad(text, max_length=128):
+            encoded = tokenizer(
+                text, 
+                max_length=max_length, 
+                padding="max_length", 
+                truncation=True, 
+                return_tensors="pt"
+            )
+            return encoded["input_ids"][0], encoded["attention_mask"][0]
 
-        self.data['text'] = self.data['text'].apply(preprocess_text)
-        self.train_data, self.test_data = train_test_split(self.data, test_size=0.2, random_state=42)
+        # Apply tokenization and padding
+        tokenized_data = self.data['text'].apply(lambda x: tokenize_and_pad(x))
+        self.data['input_ids'] = tokenized_data.apply(lambda x: x[0])
+        self.data['attention_mask'] = tokenized_data.apply(lambda x: x[1])
 
-        def get_glove_embedding(word):
-            return self.glove_embeddings.get(word, np.zeros(100))
+        # Convert data into PyTorch tensors
+        self.data['input_ids'] = self.data['input_ids'].apply(lambda x: torch.tensor(x, dtype=torch.long))
+        self.data['attention_mask'] = self.data['attention_mask'].apply(lambda x: torch.tensor(x, dtype=torch.long))
 
-        def encode_phrase_with_glove(phrase):
-            return [get_glove_embedding(word) for word in phrase]
-
-        self.train_data['text'] = self.train_data['text'].apply(encode_phrase_with_glove)
-        self.test_data['text'] = self.test_data['text'].apply(encode_phrase_with_glove)
-
-        def pad_sequence_embeddings(seq, max_length):
-            return seq + [np.zeros(100)] * (max_length - len(seq))
-        
-        self.max_length = max(self.data['text'].apply(len))
-
-        self.train_data['text'] = self.train_data['text'].apply(lambda x: pad_sequence_embeddings(x, self.max_length))
-        self.test_data['text'] = self.test_data['text'].apply(lambda x: pad_sequence_embeddings(x, self.max_length))
+        # Train-test split
+        self.train_data, self.test_data = train_test_split(self.data, test_size=0.3, random_state=42)
 
         self.next(self.prepare_data)
 
     @step
     def prepare_data(self):
         def prepare_data(df, max_length):
-            # Pad and convert text into tensors
-            X = np.array(df['text'].tolist())
-            X = torch.tensor(X, dtype=torch.float32)
-            
-            # Labels
-            y = torch.tensor(df['label'].values, dtype=torch.long)
-            
+            # Extract preprocessed input IDs and labels
+            X = torch.stack(df['input_ids'].tolist())  # Convert the list of tensors into a single tensor
+            y = torch.tensor(df['label'].values, dtype=torch.long)  # Labels remain as integers
             return X, y
-        
+
         self.X_train, self.y_train = prepare_data(self.train_data, self.max_length)
         self.X_test, self.y_test = prepare_data(self.test_data, self.max_length)
 
-        batch_size = 64
         train_dataset = TensorDataset(self.X_train, self.y_train)
         test_dataset = TensorDataset(self.X_test, self.y_test)
 
-        self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        # Calculate class sample weights
+        class_counts = np.bincount(self.train_data['label'])
+        class_weights = 1.0 / class_counts
+        sample_weights = [class_weights[label] for label in self.train_data['label']]
 
+        # Create the WeightedRandomSampler
+        sampler = WeightedRandomSampler(
+            weights=sample_weights, 
+            num_samples=len(sample_weights), 
+            replacement=True
+        )
+
+        # Update DataLoader to use the sampler for oversampling
+        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, sampler=sampler)
+        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
         self.next(self.model)
 
     @step
     def model(self):
-        input_dim = 100  # GloVe embedding dimension
-        hidden_dim = 128  # Number of hidden units in the RNN
-        output_dim = 3  # Number of classes (3 in this case)
+        output_dim = self.output_size
+
         self.device = 'cpu'
-
-        self.rrn_model = RNNModel(input_dim, hidden_dim, output_dim, self.max_length).to(self.device)
-
+        self.bert_model = BertSentimentModel(output_dim).to(self.device)
         self.next(self.train)
 
     @step
     def train(self):
         # Loss and optimizer
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(self.rrn_model.parameters(), lr=0.0001)
+        optimizer = optim.Adam(self.bert_model.parameters(), lr=0.0001)
 
         # Training loop
-        num_epochs = 10
+        num_epochs = self.num_epochs
 
         for epoch in range(num_epochs):
-            self.rrn_model.train()  # Set model to training mode
+            self.bert_model.train()  # Set model to training mode
             running_loss = 0.0
             
             for inputs, labels in self.train_loader:
@@ -152,7 +177,8 @@ class SentimentFlow(FlowSpec):
                 optimizer.zero_grad()
                 
                 # Forward pass
-                outputs = self.rrn_model(inputs)
+                attention_mask = inputs != 0  # Mask padding tokens
+                outputs = self.bert_model(inputs, attention_mask)
                 
                 # Compute loss
                 loss = criterion(outputs, labels)
@@ -169,26 +195,47 @@ class SentimentFlow(FlowSpec):
 
     @step
     def test(self):
+        from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+        import matplotlib.pyplot as plt
+
         # Evaluation loop
-        self.rrn_model.eval()  # Set model to evaluation mode
+        self.bert_model.eval()  # Set model to evaluation mode
         correct = 0
         total = 0
+        all_labels = []
+        all_predictions = []
 
         with torch.no_grad():
             for inputs, labels in self.test_loader:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 
                 # Forward pass
-                outputs = self.rrn_model(inputs)
+                attention_mask = inputs != 0  # Mask padding tokens
+                outputs = self.bert_model(inputs, attention_mask)
                 
                 # Get predictions
                 _, predicted = torch.max(outputs, 1)
                 
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
+                
+                # Store predictions and labels for confusion matrix
+                all_labels.extend(labels.cpu().numpy())
+                all_predictions.extend(predicted.cpu().numpy())
 
+        # Calculate accuracy
         accuracy = 100 * correct / total
         print(f"Test Accuracy: {accuracy}%")
+        
+        # Confusion matrix
+        cm = confusion_matrix(all_labels, all_predictions)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Negative', 'Neutral', 'Positive'])
+        
+        # Plot and save confusion matrix
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title("Confusion Matrix")
+        plt.savefig("confusion_matrix.png")
+        plt.close()  # Close the plot to prevent display during runs
 
         self.next(self.end)
 
