@@ -2,3 +2,4 @@
 glove/
 .DS_Store
 processed_data.csv
+bert_sentiment_model.pth
