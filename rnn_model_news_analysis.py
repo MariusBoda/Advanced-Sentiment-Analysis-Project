@@ -191,6 +191,9 @@ class SentimentFlow(FlowSpec):
             
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(self.train_loader)}")
                 
+        torch.save(self.bert_model.state_dict(), "bert_sentiment_model.pth")
+        print("Model saved as 'bert_sentiment_model.pth'")
+
         self.next(self.test)
 
     @step
