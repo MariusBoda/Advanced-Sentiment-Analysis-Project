@@ -54,7 +54,7 @@ class RNNModel(nn.Module):
 
 class SentimentFlow(FlowSpec):
 
-    #glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
+    glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt") #download this from online
     kaggle_dataset = Parameter("kaggle_dataset", default="ankurzing/sentiment-analysis-for-financial-news")
     num_epochs = Parameter("num_epochs", 20)
     batch_size = Parameter("batch_size", 32)
@@ -68,9 +68,10 @@ class SentimentFlow(FlowSpec):
         self.dataset_path = kagglehub.dataset_download(self.kaggle_dataset)
         self.file_path = os.path.join(self.dataset_path, "all-data.csv")
         
-        #print("Loading GloVe embeddings...")
-        
+        # uncomment this if you are using the RNN model.
+        #print("Loading GloVe embeddings...") 
         #self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
+        
         self.next(self.load_data)
 
     @step
@@ -81,6 +82,9 @@ class SentimentFlow(FlowSpec):
 
         self.next(self.preprocess)
 
+    '''
+    This preprocess step is for the BERT model.
+    '''
     @step
     def preprocess(self):
         warnings.filterwarnings("ignore", category=FutureWarning)
@@ -115,6 +119,43 @@ class SentimentFlow(FlowSpec):
         self.train_data, self.test_data = train_test_split(self.data, test_size=0.3, random_state=42)
 
         self.next(self.prepare_data)
+
+    '''
+    This commented out preprocess step is for the RNN model. 
+    Please comment out the above preprocess step and use this one if you want to test out the RNN.
+    @step
+    def preprocess(self):
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        # Label encoding for the labels
+        le = LabelEncoder()
+        self.data['label'] = le.fit_transform(self.data['label'])
+        nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
+
+        def preprocess_text(text):
+            doc = nlp(text.lower())
+            # Remove stopwords and non-alphabetic words, and return lemmatized words
+            return [token.lemma_ for token in doc if not token.is_stop and token.is_alpha]
+
+        self.data['text'] = self.data['text'].apply(preprocess_text)
+        self.train_data, self.test_data = train_test_split(self.data, test_size=0.2, random_state=42)
+
+        def get_glove_embedding(word):
+            return self.glove_embeddings.get(word, np.zeros(100))
+
+        def encode_phrase_with_glove(phrase):
+            return [get_glove_embedding(word) for word in phrase]
+
+        self.train_data['text'] = self.train_data['text'].apply(encode_phrase_with_glove)
+        self.test_data['text'] = self.test_data['text'].apply(encode_phrase_with_glove)
+
+        def pad_sequence_embeddings(seq, max_length):
+            return seq + [np.zeros(100)] * (max_length - len(seq))
+        
+        self.max_length = max(self.data['text'].apply(len))
+
+        self.train_data['text'] = self.train_data['text'].apply(lambda x: pad_sequence_embeddings(x, self.max_length))
+        self.test_data['text'] = self.test_data['text'].apply(lambda x: pad_sequence_embeddings(x, self.max_length))
+    '''
 
     @step
     def prepare_data(self):
