@@ -6,7 +6,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 # Load the model architecture and trained weights
-output_dim = 3  # Adjust based on your model's output dimensions
+output_dim = 3 
 model = BertSentimentModel(output_dim)
 model.load_state_dict(torch.load("bert_sentiment_model.pth", map_location="cpu"))
 model.eval()  # Set the model to evaluation mode
@@ -42,7 +42,7 @@ def predict_sentiment(text):
     return sentiment_classes[predicted_class], probabilities
 
 # Example: Test with a custom input
-custom_input = "The company's performance was"
+custom_input = "Inflation is not changing next year, it is sticky at 10%"
 predicted_sentiment, probabilities = predict_sentiment(custom_input)
 
 print(f"Input: {custom_input}")

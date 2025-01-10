@@ -7,10 +7,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-import spacy
 import kagglehub
-from metaflow import FlowSpec, step, Parameter, current
-from collections import defaultdict
+from metaflow import FlowSpec, step, Parameter
 from torch.utils.data import WeightedRandomSampler, DataLoader
 from transformers import BertTokenizer, BertModel
 import warnings
@@ -56,7 +54,7 @@ class RNNModel(nn.Module):
 
 class SentimentFlow(FlowSpec):
 
-    glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
+    #glove_path = Parameter("glove_path", default="glove/glove.6B.100d.txt")
     kaggle_dataset = Parameter("kaggle_dataset", default="ankurzing/sentiment-analysis-for-financial-news")
     num_epochs = Parameter("num_epochs", 20)
     batch_size = Parameter("batch_size", 32)
@@ -70,9 +68,9 @@ class SentimentFlow(FlowSpec):
         self.dataset_path = kagglehub.dataset_download(self.kaggle_dataset)
         self.file_path = os.path.join(self.dataset_path, "all-data.csv")
         
-        print("Loading GloVe embeddings...")
+        #print("Loading GloVe embeddings...")
         
-        self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
+        #self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
         self.next(self.load_data)
 
     @step
