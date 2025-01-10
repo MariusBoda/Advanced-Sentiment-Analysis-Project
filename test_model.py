@@ -42,7 +42,7 @@ def predict_sentiment(text):
     return sentiment_classes[predicted_class], probabilities
 
 # Example: Test with a custom input
-custom_input = "Inflation is not changing next year, it is sticky at 10%"
+custom_input = "Emerging markets stock index enters correction territory"
 predicted_sentiment, probabilities = predict_sentiment(custom_input)
 
 print(f"Input: {custom_input}")

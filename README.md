@@ -2,9 +2,32 @@
 
 Sentiment analysis using PyTorch. Building upon my other repository regarding sentiment analysis on tweets about stocks, this project aims to test different neural networks and to teach myself PyTorch more in depth. 
 
+## Table of Contents
+1. [Related Work](#related-work)
+2. [Dataset Source](#dataset-source)
+3. [Goals](#goals)
+4. [Project Files](#project-files)
+    - [old/simple_nn.ipynb](#oldsimple_nn-ipynb)
+    - [rnn_model_news_analysis.py](#rnn_model_news_analysis-py)
+5. [Challenges in Sentiment Analysis](#challenges-in-sentiment-analysis)
+6. [Learnings](#learnings)
+    - [Model Selection](#model-selection)
+    - [Performance Optimization](#performance-optimization)
+    - [Tool Exploration](#tool-exploration)
+7. [Model Predictions: Examples and Analysis](#model-predictions-examples-and-analysis)
+    - [Examples](#examples)
+    - [Observations](#observations)
+    - [Insights on Context](#insights-on-context)
+8. [Future Work Based on Observations](#future-work-based-on-observations)
+9. [Feedback and Contributions](#feedback-and-contributions)
+
 ## Related Work
 This project is a more advanced continuation of my earlier project on sentiment analysis:  
 [ML_Project_2023](https://github.com/MariusBoda/ML_Project_2023)
+
+## Dataset Source
+
+The dataset used for this project is sourced from [Kaggle Hub](https://www.kaggle.com/datasets/ankurzing/sentiment-analysis-for-financial-news).
 
 ## Goals
 - Test different neural network architectures.
@@ -57,23 +80,11 @@ Here are some sample predictions made by the model, highlighting its ability to 
    - **Predicted Sentiment**: Positive  
    - **Class Probabilities**: `tensor([[1.1746e-04, 2.1345e-04, 9.9967e-01]])`
 
-2. **Input**: *Inflation is not changing next year*  
-   - **Predicted Sentiment**: Neutral  
-   - **Class Probabilities**: `tensor([[3.2314e-04, 9.9641e-01, 3.2667e-03]])`
-
-3. **Input**: *Inflation is not changing next year, it remains at 10%*  
+2. **Input**: *Inflation is not changing next year, it remains at 10%*  
    - **Predicted Sentiment**: Neutral  
    - **Class Probabilities**: `tensor([[4.7416e-04, 9.9391e-01, 5.6145e-03]])`
 
-4. **Input**: *Inflation is not changing next year, it stays at the high of 10%*  
-   - **Predicted Sentiment**: Neutral  
-   - **Class Probabilities**: `tensor([[0.0014, 0.8965, 0.1021]])`
-
-5. **Input**: *Inflation is not changing next year, it is sticky at the high of 10%*  
-   - **Predicted Sentiment**: Negative  
-   - **Class Probabilities**: `tensor([[0.9490, 0.0455, 0.0055]])`
-
-6. **Input**: *Inflation is not changing next year, it is sticky at 10%*  
+3. **Input**: *Inflation is not changing next year, it is sticky at 10%*  
    - **Predicted Sentiment**: Negative  
    - **Class Probabilities**: `tensor([[0.9235, 0.0710, 0.0056]])`
 

@@ -16,7 +16,8 @@ import warnings
 class BertSentimentModel(nn.Module):
     def __init__(self, output_dim):
         super(BertSentimentModel, self).__init__()
-        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        #self.bert = BertModel.from_pretrained("bert-base-uncased")
+        self.bert = BertModel.from_pretrained("yiyanghkust/finbert-tone")
         self.fc = nn.Linear(self.bert.config.hidden_size, output_dim)
 
     def forward(self, input_ids, attention_mask):
@@ -71,7 +72,7 @@ class SentimentFlow(FlowSpec):
         # uncomment this if you are using the RNN model.
         #print("Loading GloVe embeddings...") 
         #self.glove_embeddings = self.load_glove_embeddings(self.glove_path)
-        
+
         self.next(self.load_data)
 
     @step
@@ -93,7 +94,8 @@ class SentimentFlow(FlowSpec):
         self.data['label'] = le.fit_transform(self.data['label'])
 
         # Load BERT tokenizer
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        #tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        tokenizer = BertTokenizer.from_pretrained("yiyanghkust/finbert-tone")
         self.max_length=128
         # Tokenize text and prepare input for BERT
         def tokenize_and_pad(text, max_length=128):
