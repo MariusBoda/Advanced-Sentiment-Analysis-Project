@@ -24,7 +24,17 @@ This project is a more advanced continuation of my earlier project on sentiment 
 
   ![Confusion Matrix](confusion_matrix.png)
 
-## Challenges and Learnings
+## Challenges in Sentiment Analysis
+One of the fundamental challenges in sentiment analysis is handling context and subjective interpretation. For example:
+
+- **"Inflation remained the same."**  
+  - This statement's sentiment depends heavily on context:  
+    - If inflation was previously at 10%, this could be viewed negatively, indicating persistent high inflation.  
+    - If inflation was at 2%, it might be seen as positive or neutral, suggesting stability in a healthy economic environment.  
+
+The model needs to understand not only the sentence itself but also the broader context or external knowledge to infer the correct sentiment. This makes tasks like sentiment analysis more complex than they appear at first glance.
+
+## Learnings
 Throughout this project, I encountered various challenges and learning opportunities:  
 1. **Model Selection**:  
    - Experimented with multiple architectures, such as FNNs, RNNs, and transformers like BERT.  
@@ -38,18 +48,52 @@ Throughout this project, I encountered various challenges and learning opportuni
    - Deepened my understanding of PyTorch for model development and training.  
    - Started learning MetaFlow for workflow management, though more work remains to integrate it fully into the project pipeline.
 
-## Future Enhancements
-- **Web Deployment**:  
-  Deploy the sentiment analysis model on a user-friendly webpage using frameworks like Flask or Django.  
+## Model Predictions: Examples and Analysis
 
-- **Interactive Features**:  
-  Allow users to input sentences and visualize the model’s sentiment analysis predictions in real-time, accompanied by confidence scores.
+Here are some sample predictions made by the model, highlighting its ability to handle various inputs and the associated class probabilities for each sentiment category:
 
-- **Scalable Data Processing**:  
-  Explore distributed data processing using tools like Apache Spark or Dask to handle larger datasets.
+### Examples
+1. **Input**: *Elon Musk says that Tesla Sales were super good last year*  
+   - **Predicted Sentiment**: Positive  
+   - **Class Probabilities**: `tensor([[1.1746e-04, 2.1345e-04, 9.9967e-01]])`
 
-- **Additional Metrics**:  
-  Introduce fine-grained sentiment analysis metrics, such as detecting sarcasm or multi-dimensional sentiment categories (e.g., joy, anger, sadness).
+2. **Input**: *Inflation is not changing next year*  
+   - **Predicted Sentiment**: Neutral  
+   - **Class Probabilities**: `tensor([[3.2314e-04, 9.9641e-01, 3.2667e-03]])`
+
+3. **Input**: *Inflation is not changing next year, it remains at 10%*  
+   - **Predicted Sentiment**: Neutral  
+   - **Class Probabilities**: `tensor([[4.7416e-04, 9.9391e-01, 5.6145e-03]])`
+
+4. **Input**: *Inflation is not changing next year, it stays at the high of 10%*  
+   - **Predicted Sentiment**: Neutral  
+   - **Class Probabilities**: `tensor([[0.0014, 0.8965, 0.1021]])`
+
+5. **Input**: *Inflation is not changing next year, it is sticky at the high of 10%*  
+   - **Predicted Sentiment**: Negative  
+   - **Class Probabilities**: `tensor([[0.9490, 0.0455, 0.0055]])`
+
+6. **Input**: *Inflation is not changing next year, it is sticky at 10%*  
+   - **Predicted Sentiment**: Negative  
+   - **Class Probabilities**: `tensor([[0.9235, 0.0710, 0.0056]])`
+
+### Observations
+1. **Strengths**:
+   - The model successfully identifies clearly positive inputs (e.g., Tesla sales being "super good") with high confidence.
+   - It handles neutral cases effectively, assigning high probabilities to the "Neutral" sentiment.
+
+2. **Challenges**:
+   - Sentences with ambiguous or nuanced contexts, such as those involving inflation, highlight areas for improvement.
+   - For example, while "Inflation is not changing next year" is classified as neutral, adding terms like "sticky" or "high" pushes the sentiment towards negative. This indicates the model partially captures the underlying context but struggles with highly subjective phrases.
+
+3. **Insights on Context**:
+   - The word "sticky" has a significant impact on the sentiment classification, showing the model's sensitivity to specific terms.
+   - However, the transition from neutral to negative sentiment is not always consistent across similar phrases, suggesting room for better context embedding or fine-tuning.
+
+### Future Work Based on Observations
+- **Enhancing Contextual Understanding**: Improve the model's sensitivity to phrases involving economic context by training on domain-specific datasets.  
+- **Fine-Grained Sentiment Analysis**: Develop the ability to distinguish between varying degrees of negativity (e.g., "high of 10%" versus "sticky at 10%").  
+- **Explainability**: Incorporate methods to visualize word importance to better understand why the model makes certain predictions.
 
 ## Feedback and Contributions
 Feedback, suggestions, and contributions are welcome! If you're interested in collaborating or have ideas for improvement, feel free to open an issue or submit a pull request.
