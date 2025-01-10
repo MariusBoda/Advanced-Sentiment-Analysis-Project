@@ -1,6 +1,16 @@
 # Advanced-Sentiment-Analysis-Project
 
-Sentiment analysis using PyTorch. Building upon my other repository regarding sentiment analysis, this project aims to test different neural networks and to teach myself PyTorch more in depth. Other goals include deploying this on a webpage, creating a sentiment metric between [0,1] for the sentiment of an input sentence, and learning the MetaFlow package.
+Sentiment analysis using PyTorch. Building upon my other repository regarding sentiment analysis, this project aims to test different neural networks and to teach myself PyTorch more in depth. 
+
+## Related Work
+This project builds upon concepts and techniques explored in my earlier repository:  
+[ML_Project_2023](https://github.com/MariusBoda/ML_Project_2023)
+
+## Goals
+- Test different neural network architectures.
+- Learn more about PyTorch and MetaFlow.
+- Deploy a sentiment analysis model on a webpage.
+- Create a sentiment metric ranging from [0,1].
 
 ## Project Files
 
@@ -14,9 +24,3 @@ Sentiment analysis using PyTorch. Building upon my other repository regarding se
 
   ![Confusion Matrix](confusion_matrix.png)
 
-## Goals
-- Test different neural network architectures.
-- Learn PyTorch in depth.
-- Deploy a sentiment analysis model on a webpage.
-- Create a sentiment metric ranging from [0,1].
-- Explore the MetaFlow package.
