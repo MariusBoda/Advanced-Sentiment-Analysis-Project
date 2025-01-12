@@ -12,7 +12,9 @@ model.load_state_dict(torch.load("bert_sentiment_model.pth", map_location="cpu")
 model.eval()  # Set the model to evaluation mode
 
 # Load the tokenizer
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+#tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+tokenizer = BertTokenizer.from_pretrained("ProsusAI/finbert")
+
 
 def preprocess_text(text, max_length=128):
     """

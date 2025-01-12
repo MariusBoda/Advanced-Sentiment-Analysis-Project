@@ -12,12 +12,14 @@ from metaflow import FlowSpec, step, Parameter
 from torch.utils.data import WeightedRandomSampler, DataLoader
 from transformers import BertTokenizer, BertModel
 import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 class BertSentimentModel(nn.Module):
     def __init__(self, output_dim):
         super(BertSentimentModel, self).__init__()
         #self.bert = BertModel.from_pretrained("bert-base-uncased")
-        self.bert = BertModel.from_pretrained("yiyanghkust/finbert-tone")
+        self.bert = BertModel.from_pretrained("ProsusAI/finbert")
         self.fc = nn.Linear(self.bert.config.hidden_size, output_dim)
 
     def forward(self, input_ids, attention_mask):
@@ -88,14 +90,15 @@ class SentimentFlow(FlowSpec):
     '''
     @step
     def preprocess(self):
-        warnings.filterwarnings("ignore", category=FutureWarning)
         # Label encoding for the labels
         le = LabelEncoder()
         self.data['label'] = le.fit_transform(self.data['label'])
 
         # Load BERT tokenizer
         #tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        tokenizer = BertTokenizer.from_pretrained("yiyanghkust/finbert-tone")
+        tokenizer = BertTokenizer.from_pretrained("ProsusAI/finbert")
+        self.max_length = 128
+
         self.max_length=128
         # Tokenize text and prepare input for BERT
         def tokenize_and_pad(text, max_length=128):
@@ -117,8 +120,11 @@ class SentimentFlow(FlowSpec):
         self.data['input_ids'] = self.data['input_ids'].apply(lambda x: torch.tensor(x, dtype=torch.long))
         self.data['attention_mask'] = self.data['attention_mask'].apply(lambda x: torch.tensor(x, dtype=torch.long))
 
+        # Save the preprocessed data to CSV
+        self.data.to_csv(self.preprocessed_csv_path, index=False)
+        
         # Train-test split
-        self.train_data, self.test_data = train_test_split(self.data, test_size=0.3, random_state=42)
+        self.train_data, self.test_data = train_test_split(self.data, test_size=0.25, random_state=42)
 
         self.next(self.prepare_data)
 

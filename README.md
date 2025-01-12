@@ -43,7 +43,7 @@ The dataset used for this project is sourced from [Kaggle Hub](https://www.kaggl
 - **`rnn_model_news_analysis.py`**:  
   Contains both RNN and BERT models.  
   - **RNN Results**: Test accuracy was around 60%, and the confusion matrix was not very exciting.  
-  - **BERT Results**: Showed a significant increase in test accuracy, achieving around 85%. The confusion matrix for the BERT model is shown below:
+  - **BERT Results**: Fine tuning a BERT model from huggingface.co that is pretrained on finanical text. Showed a significant increase in test accuracy, achieving around 85%. Acheiving a cross entropy loss of around 0.026 after 10 epochs. The confusion matrix for the BERT model is shown below:
 
   ![Confusion Matrix](confusion_matrix.png)
 
