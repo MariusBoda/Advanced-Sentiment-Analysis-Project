@@ -26,6 +26,14 @@
         .article p {
             color: #555;
         }
+        /* Flex container for the summary and sentiment */
+        .article-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            flex-wrap: wrap; /* Allow wrapping to the next line */
+        }
         .summary-box {
             font-weight: bold;
             padding: 10px;
@@ -34,16 +42,14 @@
             border-radius: 5px;
             cursor: pointer;
             text-align: left;
+            width: 70%;  /* Adjust the width of the summary */
+        }
+        .sentiment-box {
+            width: 28%;  /* Adjust the width of the sentiment box */
+            margin-left: 10px;
         }
         .summary-box:hover {
             background-color: #b0b0b0;
-        }
-        .expanded-summary {
-            display: none;
-            padding-top: 10px;
-            font-size: 14px;
-            color: #333;
-            text-align: left;
         }
         .sentiment {
             font-weight: bold;
@@ -54,7 +60,7 @@
             background-color: #d3d3d3;
             border-radius: 5px;
             cursor: pointer;
-            width: auto;
+            width: 100%;
             transition: all 0.3s ease;
         }
         .sentiment:hover {
@@ -108,23 +114,23 @@
         <div class="articles">
             {% for article in article_details %}
                 <div class="article">
-                    <!-- Title and Short Summary -->
-                    <div class="summary-box" onclick="toggleSummary(this)">
-                        <p>{{ article.summary }}</p>
-                    </div>
+                    <!-- Flex container for the summary and sentiment -->
+                    <div class="article-content">
+                        <!-- Title and Short Summary -->
+                        <div class="summary-box">
+                            <p>{{ article.summary }}</p>
+                        </div>
 
-                    <!-- Expanded Summary Box (Initially hidden) -->
-                    <div class="expanded-summary">
-                        <p>{{ article.long_summary }}</p>
-                    </div>
-
-                    <!-- Sentiment with expandable probabilities -->
-                    <div class="sentiment {{ article.sentiment | lower }}" onclick="this.classList.toggle('active')">
-                        {{ article.sentiment }}
-                        <div class="expandable-content">
-                            <p><strong>Negative Probability:</strong> {{ article.probabilities[0] | round(2) }}</p>
-                            <p><strong>Neutral Probability:</strong> {{ article.probabilities[1] | round(2) }}</p>
-                            <p><strong>Positive Probability:</strong> {{ article.probabilities[2] | round(2) }}</p>
+                        <!-- Sentiment with expandable probabilities -->
+                        <div class="sentiment-box">
+                            <div class="sentiment {{ article.sentiment | lower }}" onclick="this.classList.toggle('active')">
+                                {{ article.sentiment }}
+                                <div class="expandable-content">
+                                    <p><strong>Negative Probability:</strong> {{ article.probabilities[0] | round(2) }}</p>
+                                    <p><strong>Neutral Probability:</strong> {{ article.probabilities[1] | round(2) }}</p>
+                                    <p><strong>Positive Probability:</strong> {{ article.probabilities[2] | round(2) }}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -136,7 +142,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Function to toggle the expanded summary
+        // Function to toggle the expanded sentiment box
         function toggleSummary(summaryBox) {
             const expandedSummary = summaryBox.nextElementSibling;
             const isExpanded = expandedSummary.style.display === 'block';
