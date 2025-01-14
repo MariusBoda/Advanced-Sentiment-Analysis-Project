@@ -4,6 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sentiment Analysis Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        h3 {
+            color: #0056b3;
+        }
+        h4 {
+            margin-top: 20px;
+            color: #333;
+        }
+        p, ul {
+            font-size: 16px;
+            color: #555;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        ul li {
+            margin: 5px 0;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
     <h1>Sentiment Analysis Result</h1>
@@ -15,15 +64,14 @@
     
     <h4>Sentiment Probabilities:</h4>
     <ul>
-        <li>Negative: {{ probabilities['Negative'] }}</li>
-        <li>Neutral: {{ probabilities['Neutral'] }}</li>
-        <li>Positive: {{ probabilities['Positive'] }}</li>
+        <li><strong>Negative:</strong> {{ probabilities['Negative'] | round(2) }}</li>
+        <li><strong>Neutral:</strong> {{ probabilities['Neutral'] | round(2) }}</li>
+        <li><strong>Positive:</strong> {{ probabilities['Positive'] | round(2) }}</li>
     </ul>
     
     <p><strong>Article URL:</strong> <a href="{{ article_url }}" target="_blank">{{ article_url }}</a></p>
     
     <!-- Back Button -->
     <button onclick="window.location.href='/'">Back to Home</button>
-
 </body>
 </html>

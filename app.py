@@ -4,6 +4,7 @@ from transformers import BertTokenizer, pipeline
 from newspaper import Article
 from rnn_model_news_analysis import BertSentimentModel  # Assuming the model is in 'rnn_model_news_analysis.py'
 import torch.nn.functional as F
+import numpy as np
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -17,20 +18,36 @@ tokenizer = BertTokenizer.from_pretrained("ProsusAI/finbert")
 # Load the pre-trained summarization model
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
-# Function to predict sentiment
-def predict_sentiment(text):
+# Helper function to tokenize and split text into chunks
+def tokenize_and_chunk(text, max_length=256):
+    tokens = tokenizer.encode(text, truncation=False, add_special_tokens=False)
+    chunks = [tokens[i:i + max_length - 2] for i in range(0, len(tokens), max_length - 2)]
+    return ["[CLS] " + tokenizer.decode(chunk) + " [SEP]" for chunk in chunks]
+
+# Function to predict sentiment for a single chunk
+def predict_chunk_sentiment(chunk):
     model.eval()
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=128)
+    inputs = tokenizer(chunk, return_tensors="pt", padding=True, truncation=True, max_length=256)
     input_ids = inputs['input_ids'].to(device)
     attention_mask = inputs['attention_mask'].to(device)
 
     with torch.no_grad():
         outputs = model(input_ids, attention_mask)
-        _, predicted = torch.max(outputs, dim=1)
-        probabilities = F.softmax(outputs, dim=1).cpu().numpy()
+        probabilities = F.softmax(outputs, dim=1).cpu().numpy()[0]
+    
+    return probabilities
+
+# Function to predict sentiment for the entire text
+def predict_sentiment(text):
+    chunks = tokenize_and_chunk(text)
+    all_probabilities = [predict_chunk_sentiment(chunk) for chunk in chunks]
+
+    # Aggregate probabilities (e.g., by averaging)
+    aggregated_probabilities = np.mean(all_probabilities, axis=0)
+    predicted_label = np.argmax(aggregated_probabilities)
 
     sentiment_map = {0: 'Negative', 1: 'Neutral', 2: 'Positive'}
-    return sentiment_map[predicted.item()], probabilities[0]
+    return sentiment_map[predicted_label], aggregated_probabilities
 
 # Route for home page
 @app.route('/')
@@ -49,9 +66,11 @@ def predict():
             article.download()
             article.parse()
             
+            article.nlp()
+
             title = article.title
             full_text = article.text
-            
+
             # Summarize the article
             summary = summarizer(
                 full_text, 
