@@ -3,75 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentiment Analysis Result</title>
+    <title>Sentiment Analysis Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 0;
             background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            text-align: center;
         }
-        h1 {
-            color: #333;
+        .container {
+            margin-top: 30px;
         }
-        h3 {
-            color: #0056b3;
+        .article {
+            background-color: #fff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        h4 {
-            margin-top: 20px;
-            color: #333;
-        }
-        p, ul {
-            font-size: 16px;
+        .article p {
             color: #555;
         }
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        ul li {
-            margin: 5px 0;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            color: #fff;
-            background-color: #007bff;
-            border: none;
-            border-radius: 4px;
+        .summary-box {
+            font-weight: bold;
+            padding: 10px;
+            margin: 5px;
+            background-color: #e2e3e5;
+            border-radius: 5px;
             cursor: pointer;
+            text-align: left;
         }
-        button:hover {
-            background-color: #0056b3;
+        .summary-box:hover {
+            background-color: #b0b0b0;
+        }
+        .expanded-summary {
+            display: none;
+            padding-top: 10px;
+            font-size: 14px;
+            color: #333;
+            text-align: left;
+        }
+        .sentiment {
+            font-weight: bold;
+            display: inline-block;
+            position: relative;
+            padding: 10px;
+            margin: 5px;
+            background-color: #d3d3d3;
+            border-radius: 5px;
+            cursor: pointer;
+            width: auto;
+            transition: all 0.3s ease;
+        }
+        .sentiment:hover {
+            background-color: #b0b0b0;
+        }
+        .expandable-content {
+            display: none;
+            background-color: #f1f1f1;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            font-size: 14px;
+            color: #333;
+        }
+        .sentiment.active .expandable-content {
+            display: block;
+        }
+        .sentiment.negative {
+            background-color: #f8d7da;
+        }
+        .sentiment.somewhat-negative {
+            background-color: #fff3cd;
+        }
+        .sentiment.neutral {
+            background-color: #e2e3e5;
+        }
+        .sentiment.somewhat-positive {
+            background-color: #d4edda;
+        }
+        .sentiment.positive {
+            background-color: #c3e6cb;
+        }
+        .back-button {
+            margin-top: 20px;
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <h1>Sentiment Analysis Result</h1>
-    
-    <p><strong>Article Title:</strong> {{ title }}</p>
-    <p><strong>Summary:</strong> {{ summary }}</p>
-    
-    <h3>Predicted Sentiment: {{ sentiment }}</h3>
-    
-    <h4>Sentiment Probabilities:</h4>
-    <ul>
-        <li><strong>Negative:</strong> {{ probabilities['Negative'] | round(2) }}</li>
-        <li><strong>Neutral:</strong> {{ probabilities['Neutral'] | round(2) }}</li>
-        <li><strong>Positive:</strong> {{ probabilities['Positive'] | round(2) }}</li>
-    </ul>
-    
-    <p><strong>Article URL:</strong> <a href="{{ article_url }}" target="_blank">{{ article_url }}</a></p>
-    
-    <!-- Back Button -->
-    <button onclick="window.location.href='/'">Back to Home</button>
+    <div class="container">
+        <h3>Article Sentiments:</h3>
+        <div class="articles">
+            {% for article in article_details %}
+                <div class="article">
+                    <!-- Title and Short Summary -->
+                    <div class="summary-box" onclick="toggleSummary(this)">
+                        <p>{{ article.summary }}</p>
+                    </div>
+
+                    <!-- Expanded Summary Box (Initially hidden) -->
+                    <div class="expanded-summary">
+                        <p>{{ article.long_summary }}</p>
+                    </div>
+
+                    <!-- Sentiment with expandable probabilities -->
+                    <div class="sentiment {{ article.sentiment | lower }}" onclick="this.classList.toggle('active')">
+                        {{ article.sentiment }}
+                        <div class="expandable-content">
+                            <p><strong>Negative Probability:</strong> {{ article.probabilities[0] | round(2) }}</p>
+                            <p><strong>Neutral Probability:</strong> {{ article.probabilities[1] | round(2) }}</p>
+                            <p><strong>Positive Probability:</strong> {{ article.probabilities[2] | round(2) }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <a href="/" class="back-button">Go Back</a>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Function to toggle the expanded summary
+        function toggleSummary(summaryBox) {
+            const expandedSummary = summaryBox.nextElementSibling;
+            const isExpanded = expandedSummary.style.display === 'block';
+            
+            if (isExpanded) {
+                expandedSummary.style.display = 'none';
+            } else {
+                expandedSummary.style.display = 'block';
+            }
+        }
+    </script>
 </body>
 </html>
