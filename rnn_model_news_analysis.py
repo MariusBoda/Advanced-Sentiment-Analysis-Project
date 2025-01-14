@@ -12,8 +12,12 @@ from metaflow import FlowSpec, step, Parameter
 from torch.utils.data import WeightedRandomSampler, DataLoader
 from transformers import BertTokenizer, BertModel
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+# Contains two class definitions. The first is for the BERT model, and the second is for the RNN model.
+# The BERT model is a pre-trained model from the Hugging Face Transformers library, 
+# which I have then fine-tuned on the financial news dataset!
 
 class BertSentimentModel(nn.Module):
     def __init__(self, output_dim):
