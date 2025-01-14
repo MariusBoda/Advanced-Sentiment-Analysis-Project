@@ -22,6 +22,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 class BertSentimentModel(nn.Module):
     def __init__(self, output_dim):
         super(BertSentimentModel, self).__init__()
+        # Here I also tried out the basic bert-base-uncased model, but the finbert model gave better results.
         #self.bert = BertModel.from_pretrained("bert-base-uncased")
         self.bert = BertModel.from_pretrained("ProsusAI/finbert")
         self.fc = nn.Linear(self.bert.config.hidden_size, output_dim)

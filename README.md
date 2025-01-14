@@ -2,6 +2,8 @@
 
 Sentiment analysis using PyTorch. Building upon my other repository regarding sentiment analysis on tweets about stocks, this project aims to test different neural networks and to teach myself PyTorch more in depth. 
 
+Different approachs were tested by me. I tried using a RNN model with GloVe embeddings, a basic uncased BERT model, and finally a BERT model trained more on finanical data. The final finBERT model I ended up using was then further trained by me to fit my specific task.
+
 ## Table of Contents
 1. [Related Work](#related-work)
 2. [Dataset Source](#dataset-source)

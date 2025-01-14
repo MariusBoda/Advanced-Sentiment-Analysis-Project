@@ -15,7 +15,6 @@ model.eval()  # Set the model to evaluation mode
 #tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("ProsusAI/finbert")
 
-
 def preprocess_text(text, max_length=128):
     """
     Tokenizes and prepares input text for BERT model.
