@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analysis Result</title>
+</head>
+<body>
+    <h1>Sentiment Analysis Result</h1>
+    
+    <p><strong>Article Title:</strong> {{ title }}</p>
+    <p><strong>Summary:</strong> {{ summary }}</p>
+    
+    <h3>Predicted Sentiment: {{ sentiment }}</h3>
+    
+    <h4>Sentiment Probabilities:</h4>
+    <ul>
+        <li>Negative: {{ probabilities['Negative'] }}</li>
+        <li>Neutral: {{ probabilities['Neutral'] }}</li>
+        <li>Positive: {{ probabilities['Positive'] }}</li>
+    </ul>
+    
+    <p><strong>Article URL:</strong> <a href="{{ article_url }}" target="_blank">{{ article_url }}</a></p>
+    
+    <!-- Back Button -->
+    <button onclick="window.location.href='/'">Back to Home</button>
+
+</body>
+</html>

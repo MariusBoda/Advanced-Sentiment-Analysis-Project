@@ -1,5 +1,6 @@
 import torch
 from transformers import BertTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from rnn_model_news_analysis import BertSentimentModel
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -13,7 +14,7 @@ model.eval()  # Set the model to evaluation mode
 
 # Load the tokenizer
 #tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-tokenizer = BertTokenizer.from_pretrained("ProsusAI/finbert")
+tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
 
 def preprocess_text(text, max_length=128):
     """
