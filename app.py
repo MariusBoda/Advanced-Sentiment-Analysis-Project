@@ -92,8 +92,6 @@ def fetch_stock_news(ticker):
     return articles
 
 # Function to summarize the article content using the BART model
-def summarize_article_content(content, length):
-    summarized = summarizer(content, max_length=length, min_length=10, do_sample=False)
 def summarize_article_content(content, length=50):
     # Check if the input length is smaller than the max length
     input_length = len(content.split())  # Using word count to estimate length

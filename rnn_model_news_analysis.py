@@ -115,7 +115,6 @@ class SentimentFlow(FlowSpec):
                 return_tensors="pt"
             )
             return encoded["input_ids"][0], encoded["attention_mask"][0]
-
         # Apply tokenization and padding
         tokenized_data = self.data['text'].apply(lambda x: tokenize_and_pad(x))
         self.data['input_ids'] = tokenized_data.apply(lambda x: x[0])
