@@ -67,7 +67,7 @@ class SentimentFlow(FlowSpec):
     num_epochs = Parameter("num_epochs", 20)
     batch_size = Parameter("batch_size", 32)
     hidden_size = Parameter("hidden_size", 128)
-    output_size = Parameter("output_size", 3) # (positive, negative)
+    output_size = Parameter("output_size", 3) # (positive, negative, neutral)
     preprocessed_csv_path = "preprocessed_data.csv"  # Path to save the preprocessed data
     
     @step
